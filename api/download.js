@@ -1,92 +1,89 @@
 // api/download.js
-// Vercel Serverless Function for scraping cartoons.lk pages
-// Deploy to Vercel: Place this in /api/download.js
-// Endpoint: https://your-vercel-app.vercel.app/api/download?url=https://cartoons.lk/alvin-and-the-chipmunks-sinhala-dubbed-movie/
-// Handles GET requests with ?url= query param
+// ESM-compatible Vercel Serverless Function
+// Endpoint: https://cartoonlkDl.vercel.app/api/download?url=https://cartoons.lk/alvin-and-the-chipmunks-sinhala-dubbed-movie/
 
-const axios = require('axios');
-const cheerio = require('cheerio');
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 
-module.exports = async (req, res) => {
-  // Only allow GET requests
+export default async function handler(req, res) {
+  // Only allow GET
   if (req.method !== 'GET') {
+    console.log('Method not allowed:', req.method);
     return res.status(405).json({ status: false, error: 'Method not allowed' });
   }
 
   const { url } = req.query;
   if (!url) {
+    console.log('Missing URL param');
     return res.status(400).json({ status: false, error: 'Missing url query parameter' });
   }
 
-  // Validate URL (basic check for cartoons.lk)
+  // Validate URL
   if (!url.startsWith('https://cartoons.lk/')) {
+    console.log('Invalid domain:', url);
     return res.status(400).json({ status: false, error: 'Invalid URL domain' });
   }
 
   try {
-    // Request headers from the provided example (adapt as needed)
+    console.log('Starting scrape for URL:', url);
+
+    // Updated headers (fresher UA, no old cookies—site may rotate them)
     const headers = {
-      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-      'purpose': 'prefetch',
-      'sec-purpose': 'prefetch',
+      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'upgrade-insecure-requests': '1',
-      'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-      'sec-ch-ua-mobile': '?1',
-      'sec-ch-ua-platform': '"Android"',
+      'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not?A_Brand";v="24"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+      'sec-fetch-dest': 'document',
+      'sec-fetch-mode': 'navigate',
       'sec-fetch-site': 'none',
-      'sec-fetch-mode': 'no-cors',
-      'sec-fetch-dest': 'empty',
-      'referer': 'https://cartoons.lk/',
-      'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
-      'accept-encoding': 'gzip, deflate, br, zstd',
-      'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8,ar;q=0.7,si;q=0.6,zh-CN;q=0.5,zh;q=0.4',
+      'sec-fetch-user': '?1',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'accept-language': 'en-US,en;q=0.9',
     };
 
-    // Cookies from the provided example (stringify for axios)
-    const cookies = [
-      'SITE_TOTAL_ID=aR02hJnYNxzKzKk5JvGoRQABjRI',
-      '_ga=GA1.1.1780473608.1763522184',
-      '_lscache_vary=6c5dbbe64bae8996d44349a065ba5e0e',
-      'pp_main_fa490bee22e01898fce1478d89582fc1=1',
-      '_ga_X1311K3XYS=GS2.1.s1764124535$o4$g0$t1764124535$j60$l0$h0',
-      'pp_sub_fa490bee22e01898fce1478d89582fc1=1',
-      'pp_delay_fa490bee22e01898fce1478d89582fc1=1',
-      'dom3ic8zudi28v8lr6fgphwffqoz0j6c=0d151ded-1205-4d30-8f44-2dbcaa85410a%3A2%3A1'
-    ].join('; ');
+    // Minimal cookies (omit old ones—fetch fresh if needed via browser)
+    headers['cookie'] = 'SITE_TOTAL_ID=aR02hJnYNxzKzKk5JvGoRQABjRI; _ga=GA1.1.1780473608.1763522184';
 
-    headers['cookie'] = cookies;
-
-    // Fetch the page
-    const response = await axios.get(url, { headers });
-    const html = response.data;
+    // Fetch page
+    console.log('Fetching page...');
+    const { data: html } = await axios.get(url, { 
+      headers, 
+      timeout: 10000,  // 10s timeout
+      decompress: true 
+    });
+    console.log('Page fetched, length:', html.length);
 
     // Parse with Cheerio
     const $ = cheerio.load(html);
+    console.log('HTML parsed');
 
-    // Extract title (from og:title meta or h1)
-    const title = $('meta[property="og:title"]').attr('content') || $('h1.post-title').text().trim();
+    // Extract title
+    let title = $('meta[property="og:title"]').attr('content') || $('h1.post-title').text().trim() || 'Unknown Title';
+    console.log('Extracted title:', title);
 
-    // Extract description (from og:description meta)
-    const description = $('meta[property="og:description"]').attr('content') || '';
+    // Extract description
+    let description = $('meta[property="og:description"]').attr('content') || $('meta[name="description"]').attr('content') || '';
+    console.log('Extracted description:', description ? 'Found' : 'Empty');
 
-    // Extract image (from og:image meta)
-    const image = $('meta[property="og:image"]').attr('content') || '';
+    // Extract image
+    let image = $('meta[property="og:image"]').attr('content') || '';
+    console.log('Extracted image:', image);
 
-    // Extract download link: Parse onclick from direct-download-btn
-    // Look for: onclick="directDownload('https://files.cartoons.lk/...')
+    // Extract download link
     let download = '';
     $('button.direct-download-btn').each((i, el) => {
       const onclick = $(el).attr('onclick');
       if (onclick && onclick.includes('directDownload(')) {
-        // Extract URL from onclick string: directDownload('url')
         const match = onclick.match(/directDownload\('([^']+)'\)/);
         if (match) {
           download = match[1];
+          console.log('Found download via direct-download-btn:', download);
         }
       }
     });
 
-    // If no download found, fallback to watch-online-btn (same URL in example)
+    // Fallback to watch-online-btn
     if (!download) {
       $('button.watch-online-btn').each((i, el) => {
         const onclick = $(el).attr('onclick');
@@ -94,28 +91,39 @@ module.exports = async (req, res) => {
           const match = onclick.match(/openWatchOnlineWithQuality\('([^']+)'/);
           if (match) {
             download = match[1];
+            console.log('Found download via watch-online-btn:', download);
           }
         }
       });
     }
 
-    // Response JSON
+    if (!download) {
+      console.log('No download link found');
+    }
+
+    // Response
     const result = {
       status: true,
       team: 'VISPER INC',
       creater: 'Pathum Rajapakshe',
-      title: title || 'Unknown Title',
-      description: description || 'No description available',
-      image: image || '',
+      title,
+      description,
+      image,
       download: download || 'No download link found'
     };
 
+    console.log('Success response:', JSON.stringify(result));
     res.status(200).json(result);
+
   } catch (error) {
-    console.error('Scraper error:', error.message);
+    console.error('Full error:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    }
     res.status(500).json({ 
       status: false, 
-      error: 'Failed to scrape page: ' + error.message 
+      error: 'Scrape failed: ' + (error.message || 'Unknown error') 
     });
   }
-};
+}
