@@ -6,8 +6,8 @@
   },
   "rewrites": [
     {
-      "source": "/api/download/:path*",
-      "destination": "/api/download"
+      "source": "/api/download",
+      "destination": "/api/download.js"
     }
   ]
 }
